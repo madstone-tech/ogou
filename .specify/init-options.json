@@ -1,0 +1,12 @@
+{
+  "project_name": "ogou",
+  "project_slug": "ogou",
+  "language": "go",
+  "language_version": "1.25",
+  "project_type": "cli-library",
+  "has_database": false,
+  "has_frontend": false,
+  "spec_directory": "specs",
+  "script": "sh",
+  "speckit_version": "0.8.4"
+}

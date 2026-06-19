@@ -1,0 +1,126 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  BINARY_NAME: htload
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  BUILD_TIME:
+    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Build the binary
+    deps:
+      - clean
+    cmds:
+      - go build -ldflags "-X main.version={{.VERSION}} -X main.date={{.BUILD_TIME}}" -o {{.BINARY_NAME}} ./cmd/htload
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  test-verbose:
+    desc: Run tests with verbose output
+    cmds:
+      - go test -v ./...
+
+  coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - go test -cover -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+
+  test-pkg:
+    desc: Run tests for public packages only
+    cmds:
+      - go test -v -race -coverprofile=coverage-pkg.out -covermode=atomic ./pkg/...
+
+  security:
+    desc: "Security scan — gosec (blocking on high severity) + govulncheck (advisory)"
+    cmds:
+      - go run github.com/securego/gosec/v2/cmd/gosec@latest -severity=high ./...
+      - cmd: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        ignore_error: true
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run ./...
+
+  fmt:
+    desc: Format code (gofumpt per constitution)
+    cmds:
+      - gofumpt -w .
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -f {{.BINARY_NAME}}
+      - rm -f coverage.out coverage.html coverage-pkg.out
+      - rm -rf dist/
+
+  install:
+    desc: Install to GOPATH/bin
+    deps: [build]
+    cmds:
+      - cp {{.BINARY_NAME}} {{.GOPATH}}/bin/
+      - |
+        if [ "$(uname)" = "Darwin" ]; then
+          codesign --sign - --force --preserve-metadata=entitlements,requirements,flags,runtime {{.GOPATH}}/bin/{{.BINARY_NAME}}
+        fi
+
+  deps:
+    desc: Download and tidy dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  tools:
+    desc: Install development tools
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install mvdan.cc/gofumpt@latest
+      - go install github.com/goreleaser/goreleaser@latest
+
+  run:
+    desc: Run the application (use -- to pass args)
+    cmds:
+      - go run ./cmd/htload {{.CLI_ARGS}}
+
+  release-snapshot:
+    desc: Create a snapshot release
+    cmds:
+      - goreleaser release --snapshot --clean
+
+  release:
+    desc: Create and publish a release
+    cmds:
+      - goreleaser release --clean
+
+  docker:build:
+    desc: Build the Docker image
+    cmds:
+      - docker build --build-arg VERSION={{.VERSION}} --build-arg BUILD_TIME={{.BUILD_TIME}} -t ogou:latest .
+
+  docker:run:
+    desc: Run the Docker image
+    cmds:
+      - docker run --rm ogou:latest
+
+  ci:
+    desc: Run all CI checks
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+      - task: security
+      - task: build

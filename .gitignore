@@ -1,0 +1,56 @@
+# Binaries
+htload
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+*.cov
+coverage.out
+coverage.html
+coverage.txt
+coverage-pkg.out
+coverage-internal.out
+
+# Go workspace
+go.work
+
+# Environment
+.env
+.env.local
+*.env
+.envrc
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build & release artifacts
+dist/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# LLM helper directories (session-specific, never committed)
+.kiro/
+.opencode/
+.claude/
+.claude/sessions/
+.gemini/
+prompts/
+docs/
+# Research and scratch (user-specific)
+research/
+scratch/
+notes/

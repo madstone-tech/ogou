@@ -1,0 +1,209 @@
+# GoReleaser configuration for ogou (htload)
+# https://goreleaser.com
+
+version: 2
+
+# Project metadata
+project_name: ogou
+
+# Environment variables
+env:
+  - GO111MODULE=on
+
+# Git configuration
+git:
+  tag_sort: -version:refname
+
+# Build configuration
+builds:
+  - id: htload
+    binary: htload
+    main: ./cmd/htload
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    # Build flags
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+    env:
+      - CGO_ENABLED=0
+
+# Universal binaries for macOS
+universal_binaries:
+  - id: htload_universal
+    replace: true
+    name_template: htload
+
+# Hooks
+before:
+  hooks:
+    - go mod tidy
+
+# Archives configuration
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE*
+      - CHANGELOG*
+
+# Checksum
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+# SBOMs (Syft) — optional; published alongside release assets
+# Requires syft on PATH (CI installs it). Remove this block if not wanted.
+sboms:
+  - id: archive
+    artifacts: archive
+
+# Keyless cosign signing of checksums file. Optional — remove if not using cosign.
+# Requires `id-token: write` in workflow and cosign on PATH.
+# signs:
+#   - cmd: cosign
+#     artifacts: checksum
+#     signature: "${artifact}.sigstore.json"
+#     output: true
+#     args:
+#       - sign-blob
+#       - "--bundle=${signature}"
+#       - "${artifact}"
+#       - "--yes"
+
+# Snapshot builds
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+# Changelog
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "^style:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+  groups:
+    - title: "New Features"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: "Enhancements"
+      regexp: "^.*enhance[(\\w)]*:+.*$"
+      order: 2
+    - title: "Performance Improvements"
+      regexp: "^.*perf[(\\w)]*:+.*$"
+      order: 3
+    - title: "Refactoring"
+      regexp: "^.*refactor[(\\w)]*:+.*$"
+      order: 4
+    - title: "Other"
+      order: 999
+
+# GitHub Release
+release:
+  github:
+    owner: madstone-tech
+    name: ogou
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## ogou (htload) {{ .Tag }}
+
+    HTTP load and smoke testing for APIs.
+
+    ### Installation
+
+    ```bash
+    # Download the binary for your platform from the assets below
+    tar -xzf ogou_*.tar.gz
+    sudo mv htload /usr/local/bin/
+
+    # Or using Go
+    go install github.com/madstone-tech/ogou/cmd/htload@{{ .Tag }}
+    ```
+
+    ### Verification
+
+    ```bash
+    htload --version
+    ```
+
+  footer: |
+    **Full Changelog**: https://github.com/madstone-tech/ogou/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    **Checksums**: {{ .Tag }}/checksums.txt
+
+# Docker images — published to GHCR as a multi-arch manifest.
+# Uncomment and configure when ready for container releases.
+#
+# dockers_v2:
+#   - id: htload
+#     ids: [htload]
+#     dockerfile: Dockerfile
+#     images:
+#       - "ghcr.io/madstone-tech/ogou"
+#     tags:
+#       - "{{ .Tag }}"
+#       - "v{{ .Major }}.{{ .Minor }}"
+#       - "{{ if not .Prerelease }}latest{{ end }}"
+#     platforms:
+#       - linux/amd64
+#       - linux/arm64
+#     sbom: "{{ not .IsSnapshot }}"
+#     labels:
+#       org.opencontainers.image.created: "{{ .Date }}"
+#       org.opencontainers.image.title: "{{ .ProjectName }}"
+#       org.opencontainers.image.description: "HTTP load and smoke testing CLI"
+#       org.opencontainers.image.url: "https://github.com/madstone-tech/ogou"
+#       org.opencontainers.image.source: "https://github.com/madstone-tech/ogou"
+#       org.opencontainers.image.version: "{{ .Version }}"
+#       org.opencontainers.image.revision: "{{ .FullCommit }}"
+#       org.opencontainers.image.licenses: "Apache-2.0"
+
+# # Keyless cosign signing of published images.
+# docker_signs:
+#   - cmd: cosign
+#     output: true
+#     args:
+#       - sign
+#       - "${artifact}@${digest}"
+#       - "--yes"
+
+# Announce releases
+announce:
+  skip: true

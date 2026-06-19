@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Cancel superseded in-flight runs on PRs. Preserve green-main signal.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Go mod tidy
+        run: go mod tidy
+
+      - name: Go mod verify
+        run: go mod verify
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        with:
+          files: ./coverage.txt
+          fail_ci_if_error: false
+
+      # Coverage floor — ratchet toward constitutional target (>=80% on pkg/).
+      # Measured baseline on creation: pkg/ = 0% -> floor 0%, raise per session.
+      - name: Coverage floor (pkg/, ratchet toward 80%)
+        run: |
+          go test -coverprofile=coverage-pkg.out -covermode=atomic ./pkg/... >/dev/null
+          COVERAGE=$(go tool cover -func=coverage-pkg.out | awk '/total:/ {print substr($3,1,length($3)-1)}')
+          echo "pkg/ coverage: ${COVERAGE}%"
+          awk -v c="$COVERAGE" -v min=0 'BEGIN { if (c+0 < min) { printf "Coverage %.1f%% is below the %d%% floor\n", c, min; exit 1 } }'
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: gosec (blocking on high severity)
+        run: |
+          export GOBIN="$(mktemp -d)"
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          "$GOBIN/gosec" -severity=high ./...
+
+      - name: govulncheck (advisory — reported, non-blocking)
+        continue-on-error: true
+        run: |
+          export GOBIN="$(mktemp -d)"
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$GOBIN/govulncheck" ./...
+
+      - name: Verify go.mod/go.sum unchanged (no new runtime deps)
+        run: git diff --exit-code go.mod go.sum
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build -v ./cmd/htload
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
