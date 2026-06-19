@@ -1,0 +1,32 @@
+name: potomitan-smoke
+base_url: https://mdstn.local
+
+phases:
+  - name: warmup
+    duration: 5s
+    rate:
+      constant: 1
+    steps:
+      - name: health
+        method: GET
+        path: /health
+        assertions:
+          - status: 200
+
+  - name: load
+    duration: 10s
+    rate:
+      ramp:
+        from: 1
+        to: 5
+    steps:
+      - name: health
+        method: GET
+        path: /health
+        assertions:
+          - status: 200
+      - name: ready
+        method: GET
+        path: /ready
+        assertions:
+          - status: 200
