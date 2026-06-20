@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/madstone-tech/ogou/internal/template"
 	"github.com/madstone-tech/ogou/pkg/engine"
 )
 
@@ -39,21 +41,56 @@ func (d *Driver) Execute(ctx context.Context, baseURL string, step engine.Step, 
 		CapturedVars: make(map[string]any),
 	}
 
-	url := strings.TrimSuffix(baseURL, "/") + step.Path
+	// Interpolate path
+	path, err := template.Interpolate(step.Path, sc)
+	if err != nil {
+		res.EndTime = time.Now()
+		res.Latency = res.EndTime.Sub(res.StartTime)
+		res.Error = fmt.Sprintf("template path: %v", err)
+		res.Success = false
+		return res, nil
+	}
+	url := strings.TrimSuffix(baseURL, "/") + path
+
+	// Resolve body
 	var bodyBytes []byte
 	if step.Body != nil {
-		bodyBytes, _ = step.Body.Body()
+		bodyStr, err := d.resolveBody(step.Body, sc)
+		if err != nil {
+			res.EndTime = time.Now()
+			res.Latency = res.EndTime.Sub(res.StartTime)
+			res.Error = fmt.Sprintf("template body: %v", err)
+			res.Success = false
+			return res, nil
+		}
+		bodyBytes = []byte(bodyStr)
 	}
-	req, err := http.NewRequestWithContext(ctx, step.Method, url, bytes.NewReader(bodyBytes))
+
+	method := step.Method
+	if method == "" {
+		method = "GET"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		res.EndTime = time.Now()
 		res.Latency = res.EndTime.Sub(res.StartTime)
 		res.Error = fmt.Sprintf("build request: %v", err)
+		res.Success = false
 		return res, nil
 	}
 
+	// Interpolate and set headers
 	for k, v := range step.Headers {
-		req.Header.Set(k, v)
+		interpolatedVal, err := template.Interpolate(v, sc)
+		if err != nil {
+			res.EndTime = time.Now()
+			res.Latency = res.EndTime.Sub(res.StartTime)
+			res.Error = fmt.Sprintf("template header %q: %v", k, err)
+			res.Success = false
+			return res, nil
+		}
+		req.Header.Set(k, interpolatedVal)
 	}
 
 	resp, err := d.client.Do(req)
@@ -62,9 +99,10 @@ func (d *Driver) Execute(ctx context.Context, baseURL string, step engine.Step, 
 
 	if err != nil {
 		res.Error = fmt.Sprintf("request failed: %v", err)
+		res.Success = false
 		return res, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	_, _ = io.Copy(io.Discard, resp.Body)
 	res.StatusCode = resp.StatusCode
@@ -79,6 +117,27 @@ func (d *Driver) Execute(ctx context.Context, baseURL string, step engine.Step, 
 	}
 
 	return res, nil
+}
+
+func (d *Driver) resolveBody(bs *engine.BodySource, sc *engine.StepContext) (string, error) {
+	raw := ""
+	switch {
+	case bs.File != "":
+		b, err := os.ReadFile(bs.File)
+		if err != nil {
+			return "", err
+		}
+		raw = string(b)
+	case bs.Template != "":
+		raw = bs.Template
+	case bs.Inline != "":
+		raw = bs.Inline
+	}
+	interpolated, err := template.Interpolate(raw, sc)
+	if err != nil {
+		return "", err
+	}
+	return interpolated, nil
 }
 
 // Close is a no-op for HTTP; the client is reused.

@@ -7,8 +7,8 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `github.com/google/uuid` dependency via `go get github.com/google/uuid`
-- [ ] T002 Run `go mod tidy && go mod verify` to clean module state
+- [x] T001 Add `github.com/google/uuid` dependency via `go get github.com/google/uuid`
+- [x] T002 Run `go mod tidy && go mod verify` to clean module state
 
 ---
 
@@ -16,10 +16,10 @@
 
 Blocking prerequisites for all user stories.
 
-- [ ] T003 [P] Define engine core types in `pkg/engine/types.go` (Scenario, Phase, Step, BodySource, RateProfile, Ramp, Assertion, JSONPathAssertion, ResponseTimeAssertion, Capture, Result, StepContext)
-- [ ] T004 [P] Define Driver interface in `pkg/engine/driver.go` (Name, Execute, Close)
-- [ ] T005 [P] Define Reporter interface in `pkg/engine/reporter.go` (OnScenarioStart, OnPhaseStart, OnVUStart, OnStepStart, OnStepResult, OnVUEnd, OnPhaseEnd, OnScenarioEnd)
-- [ ] T006 Implement `NewStepContext()` and body resolution `BodySource.Body()` in `pkg/engine/types.go`
+- [x] T003 [P] Define engine core types in `pkg/engine/types.go` (Scenario, Phase, Step, BodySource, RateProfile, Ramp, Assertion, JSONPathAssertion, ResponseTimeAssertion, Capture, Result, StepContext)
+- [x] T004 [P] Define Driver interface in `pkg/engine/driver.go` (Name, Execute, Close)
+- [x] T005 [P] Define Reporter interface in `pkg/engine/reporter.go` (OnScenarioStart, OnPhaseStart, OnVUStart, OnStepStart, OnStepResult, OnVUEnd, OnPhaseEnd, OnScenarioEnd)
+- [x] T006 Implement `NewStepContext()` and body resolution `BodySource.Body()` in `pkg/engine/types.go`
 
 ---
 
@@ -29,13 +29,12 @@ Blocking prerequisites for all user stories.
 
 **Independent Test**: Define a Scenario with one Phase and one Step pointing at an `httptest.Server`. Run it. Assert at least 25 Results with status 200 are collected.
 
-- [ ] T007 [P] [US1] Implement HTTP driver in `pkg/http/driver.go` (Name, Execute with GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS, Close)
-- [ ] T008 [US1] Implement Runner in `pkg/engine/runner.go` (`NewRunner`, `Run` with multi-phase VU orchestration)
-- [ ] T009 [US1] Add panic recovery in Runner VU goroutines in `pkg/engine/runner.go`
-- [ ] T010 [US1] Wire setup and teardown execution (once globally each) in `pkg/engine/runner.go`
-- [ ] T011 [US1] Implement status-code assertion in HTTP driver in `pkg/http/driver.go`
-- [ ] T012 [US1] Write unit tests for HTTP driver against `httptest.Server` in `pkg/http/driver_test.go`
-- [ ] T013 [US1] Write integration test for Runner end-to-end with `httptest.Server` in `tests/runner_test.go`
+- [x] T007 [P] [US1] Implement HTTP driver in `pkg/http/driver.go` (Name, Execute with GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS, Close)
+- [x] T008 [US1] Implement Runner in `pkg/engine/runner.go` (`NewRunner`, `Run` with multi-phase VU orchestration, panic recovery, fail_fast loop termination)
+- [x] T010 [US1] Wire setup and teardown execution (once globally each, using same `Driver.Execute` call with fresh `StepContext`) in `pkg/engine/runner.go`
+- [x] T011 [US1] Implement status-code equality assertion in HTTP driver in `pkg/http/driver.go`
+- [x] T012 [US1] Write unit tests for HTTP driver against `httptest.Server` in `pkg/http/driver_test.go`
+- [x] T013 [US1] Write integration test for Runner end-to-end with `httptest.Server` in `tests/runner_test.go`
 
 ---
 
@@ -45,9 +44,9 @@ Blocking prerequisites for all user stories.
 
 **Independent Test**: Run a Scenario through ConsoleReporter and assert stderr contains ✓/✗ markers and a summary line with totals.
 
-- [ ] T014 [P] [US2] Implement ConsoleReporter in `pkg/reporter/console.go` (✓/✗ markers, phase start/end, scenario summary, thread-safe output)
-- [ ] T015 [US2] Wire Reporter lifecycle events into Runner in `pkg/engine/runner.go` (OnScenarioStart, OnPhaseStart, OnVUStart, OnStepStart, OnStepResult, OnVUEnd, OnPhaseEnd, OnScenarioEnd)
-- [ ] T016 [US2] Write unit tests for ConsoleReporter output format in `pkg/reporter/console_test.go`
+- [x] T014 [P] [US2] Implement ConsoleReporter in `pkg/reporter/console.go` using `log/slog` with JSON output (✓/✗ markers, phase start/end, scenario summary, thread-safe output)
+- [x] T015 [US2] Wire Reporter lifecycle events into Runner in `pkg/engine/runner.go` (OnScenarioStart, OnPhaseStart, OnVUStart, OnStepStart, OnStepResult, OnVUEnd, OnPhaseEnd, OnScenarioEnd)
+- [x] T016 [US2] Write unit tests for ConsoleReporter output format in `pkg/reporter/console_test.go`
 
 ---
 
@@ -57,9 +56,9 @@ Blocking prerequisites for all user stories.
 
 **Independent Test**: Provide a Step with a template body containing `{{.UUID}}`. Run 2 VUs executing it twice. Verify all 4 outgoing request bodies contain distinct UUIDs.
 
-- [ ] T017 [P] [US3] Implement template funcmap in `internal/template/interpolate.go` (UUID, RandomString, Timestamp, TimestampNano, Env, Vars, VU.ID, VU.Iteration)
-- [ ] T018 [US3] Integrate template interpolation into HTTP driver for path, body, and headers in `pkg/http/driver.go`
-- [ ] T019 [US3] Write unit tests for template interpolation with distinct values per VU in `internal/template/interpolate_test.go`
+- [x] T017 [P] [US3] Implement template funcmap in `internal/template/interpolate.go` (UUID, RandomString, Timestamp, TimestampNano, Env, Vars, VU.ID, VU.Iteration)
+- [x] T018 [US3] Integrate template interpolation into HTTP driver for path, body, and headers in `pkg/http/driver.go`
+- [x] T019 [US3] Write unit tests for template interpolation in `internal/template/interpolate_test.go`: happy-path distinct values per VU AND error-path invalid template syntax produces Result.Error
 
 ---
 
@@ -67,12 +66,13 @@ Blocking prerequisites for all user stories.
 
 Cross-cutting concerns and cleanup.
 
-- [ ] T020 [P] Implement metrics aggregation in `internal/metrics/metrics.go` (Percentile, Mean, Min, Max, Median for `[]time.Duration`)
-- [ ] T021 Run `go test -v -race ./...` and fix any race conditions
-- [ ] T022 Run `golangci-lint run ./...` and fix all issues
-- [ ] T023 Run `gofumpt -w .` and ensure zero warnings
-- [ ] T024 Verify coverage ≥ 80% on `pkg/engine/`, `pkg/http/`, `pkg/reporter/`, `internal/template/`, `internal/metrics/`
-- [ ] T025 Update `README.md` and `AGENTS.md` with any API changes discovered during implementation
+- [x] T020 [P] Implement metrics aggregation in `internal/metrics/metrics.go` (Percentile, Mean, Min, Max, Median for `[]time.Duration`)
+- [x] T021 Run `go test -v -race ./...` and fix any race conditions
+- [x] T022 Run `golangci-lint run ./...` and fix all issues
+- [x] T023 Run `gofumpt -w .` and ensure zero warnings
+- [x] T024 Verify coverage ≥ 80% on `pkg/engine/`, `pkg/http/`, `pkg/reporter/`, `internal/template/`, `internal/metrics/`
+- [x] T025 Update `README.md` and `AGENTS.md` with any API changes discovered during implementation
+- [x] T026 Verify `pkg/engine/` does not import `net/http` or any HTTP-specific package (use `go list -f '{{.Deps}}' ./pkg/engine/ | grep net/http`)
 
 ---
 
@@ -90,7 +90,7 @@ Phase 2 (Foundational)
 
 Phase 3 (US1)
   ├── T007 → T011 → T012        (HTTP driver → assertion → tests)
-  ├── T008 → T009 → T010 → T013 (Runner → panic recovery → setup/teardown → integration)
+  ├── T008 → T010 → T013        (Runner → setup/teardown → integration)
   └── T011 → T013                (assertions needed for integration)
 
 Phase 4 (US2)
@@ -103,7 +103,7 @@ Phase 5 (US3)
 
 Phase 6 (Polish)
   ├── T020 (independent, parallel with any phase after T003)
-  └── T021-T025 (sequential, after all implementation)
+  └── T021-T026 (sequential, after all implementation)
 ```
 
 ## Parallel Opportunities
@@ -123,4 +123,4 @@ User Story 1 only (T001-T013): A Runner that can execute a simple Scenario with 
 1. **Draft interfaces first** (T003-T006): Get the shape right before implementation.
 2. **Implement US1 end-to-end** (T007-T013): Prove the core loop works.
 3. **Layer US2 and US3** (T014-T019): Add reporting and templates on top of the working loop.
-4. **Add metrics and polish** (T020-T025): Finish with shared utilities and quality gates.
+4. **Add metrics and polish** (T020-T026): Finish with shared utilities and quality gates.
