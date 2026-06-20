@@ -9,7 +9,6 @@
 
 - [ ] T001 Verify branch `002-cli-quick-mode` is clean and buildable (`go build ./cmd/htload`)
 - [ ] T002 Run existing tests and record baselines (`go test ./...`)
-- [ ] T003 Verify directory structure matches plan (cmd/htload/, existing engine/)
 
 ---
 
@@ -22,6 +21,7 @@ Blocking prerequisites for all user stories. Refactors existing `cmd/htload/main
 - [ ] T006 Wire `root.go` `Execute()` → `main.go` `Run()` with compiled flags
 - [ ] T007 Wire `root.go` to handle `--version` as a `PersistentFlag` that short-circuits before `Run()`
 - [ ] T008 Wire `root.go` to preserve scenario mode path (`--file` → existing `runScenario()`)
+- [ ] T028 Add `Count` field to `engine.Phase` struct in `pkg/engine/types.go` and update `Runner` to stop after `Count` total results (0 = disabled, count honored over duration)
 
 ---
 
@@ -41,8 +41,7 @@ Blocking prerequisites for all user stories. Refactors existing `cmd/htload/main
   (any violation returns exit code 2)
 - [ ] T012 [US1] Integrate `engine.Runner` + `http.Driver` + `reporter.ConsoleReporter` into `Run()` for quick mode execution
 - [ ] T013 [US1] Write unit tests in `cmd/htload/main_test.go`: flag compilation produces valid Scenario struct, base URL and path split correctly
-- [ ] T014 [US1] Write integration tests in `cmd/htload/main_test.go`: `Run()` with `httptest.Server`, assert request count and exit code for 200/404
-
+- [ ] T014 [US1] Write integration tests in `cmd/htload/main_test.go`: `Run()` with `httptest.Server`, assert request count and exit code for 200/404, default duration when no `-d` given, and connection-refused → exit 1
 ---
 
 ## Phase 4: User Story 2 — POST with Body and Headers (P2)
@@ -55,9 +54,7 @@ Blocking prerequisites for all user stories. Refactors existing `cmd/htload/main
 - [ ] T016 [P] [US2] Implement body source resolution in `cmd/htload/main.go`: `-D "raw"` → `BodySource{Inline}`, `-D @file` → `BodySource{File}`
 - [ ] T017 [US2] Inject default assertion `{Status: 200}` into compiled Step in `cmd/htload/main.go`
 - [ ] T018 [US2] Write unit tests in `cmd/htload/main_test.go`: header parsing edge cases (malformed, extra colons), body source resolution
-- [ ] T019 [US2] Write integration tests in `cmd/htload/main_test.go`: POST with body and headers against `httptest.Server`, assert echoed request matches
-
----
+- [ ] T019 [US2] Write integration tests in `cmd/htload/main_test.go`: POST with body and headers against `httptest.Server`, assert echoed request matches; also assert count overrides duration when both set
 
 ## Phase 5: User Story 3 — Threshold-Based Exit Codes (P2)
 
@@ -88,7 +85,6 @@ Blocking prerequisites for all user stories. Refactors existing `cmd/htload/main
 ---
 
 ## Phase 7: Polish & Cross-Cutting Concerns
-
 - [ ] T027 Wire `--file` scenario mode through `root.go` → `main.go` without regression; `runScenario()` unchanged
 - [ ] T028 Verify `cmd/htload/` does not import `net/http` directly (import boundary per Constitution XI)
 - [ ] T029 Run `go test ./...` and fix any failures
@@ -96,8 +92,9 @@ Blocking prerequisites for all user stories. Refactors existing `cmd/htload/main
 - [ ] T031 Run `golangci-lint run ./...` and fix all issues
 - [ ] T032 Run `gofumpt -w .` and ensure zero warnings
 - [ ] T033 Verify coverage ≥ 60% for `cmd/htload/` (`go test -coverprofile=... ./cmd/htload/`)
-- [ ] T034 Update `README.md` with quick mode usage examples from `quickstart.md`
-- [ ] T035 Update `AGENTS.md` if any CLI API changes discovered during implementation
+- [ ] T034 [P] Replace naïve sorting in `internal/metrics/metrics.go` with HDR Histogram or tdigest for p99 computation per Constitution Result Integrity §
+- [ ] T035 Update `README.md` with quick mode usage examples from `quickstart.md`
+- [ ] T036 Update `AGENTS.md` if any CLI API changes discovered during implementation
 
 ---
 
@@ -105,12 +102,13 @@ Blocking prerequisites for all user stories. Refactors existing `cmd/htload/main
 
 ```
 Phase 1 (Setup)
-  ├── T001 → T002 → T003
+  ├── T001 → T002
 
-Phase 2 (Refactor)
+Phase 2 (Refactor + Engine)
   ├── T004 → T005 → T006
   ├── T007 (version flag)
-  └── T008 (scenario mode preservation)
+  ├── T008 (scenario mode preservation)
+  └── T028 (engine.Phase.Count — blocking for US1 count tests)
 
 Phase 3 (US1 — Ad-Hoc Load Test)
   ├── T009 → T010 → T011 → T012
@@ -130,14 +128,14 @@ Phase 6 (Root Tests)
 
 Phase 7 (Polish)
   ├── T027 (regression check)
-  └── T028-T035 (quality gates)
+  └── T028-T036 (quality gates)
 ```
 
 ## Parallel Opportunities
 
 | Tasks | Why Parallel |
 |---|---|
-| T004 + T005 | Cobra file and business-logic file are independent once interface agreed |
+| T004 + T005 + T028 | Cobra file, business-logic file, and engine.Count are independent once interfaces agreed |
 | T015 + T016 | Header parsing and body resolution are independent |
 | T020 + T021 | Success-rate and p99 computation are independent |
 | T026 | Flag parsing tests are independent of execution tests |
@@ -149,7 +147,8 @@ User Story 1 only (T001-T014): A CLI that runs `htload <url>` with `-c` and `-d`
 ## Implementation Strategy
 
 1. **Refactor first** (T004-T008): Split the existing `main.go` into the two-file pattern. This is blocking.
-2. **Implement US1 end-to-end** (T009-T014): Get the basic quick mode working.
-3. **Layer US2 and US3** (T015-T025): Add body/headers, then thresholds.
-4. **Test root parsing** (T026): Independent flag parsing validation.
-5. **Polish and quality gates** (T027-T035): Regression check, coverage, lint, format.
+2. **Add engine Count** (T028): Minimal `engine.Phase` extension to support `--count`. Blocking for count-based tests.
+3. **Implement US1 end-to-end** (T009-T014): Get the basic quick mode working.
+4. **Layer US2 and US3** (T015-T025): Add body/headers, then thresholds.
+5. **Test root parsing** (T026): Independent flag parsing validation.
+6. **Polish and quality gates** (T027-T036): Regression check, coverage, lint, format, HDR histogram.

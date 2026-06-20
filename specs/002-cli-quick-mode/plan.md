@@ -122,13 +122,12 @@ These aggregates are compared against `--fail-if-p99` and `--fail-if-rate` thres
 
 ## Complexity Tracking
 
-This feature is fully constitution-compliant. No deviations are required.
+This feature is fully constitution-compliant with one acknowledged deviation.
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| *(none)* | | |
-
-**Note**: Cobra was previously justified in the module and is approved by Constitution III (Stdlib First). No new justifications are needed for FR-002.
+| `engine.Phase.Count` field | `--count` / `-n` flag requires count-based termination. The engine currently only supports `Duration`. Adding `Count` to `Phase` is the minimal, backward-compatible extension. | Wrapper in CLI layer: rejected — fragile, duplicates runner logic, cannot precisely interleave with VU scheduling. |
+| HDR histogram / tdigest for p99 | Constitution Result Integrity § mandates accurate percentile computation. Current `internal/metrics` uses naïve sorting (O(n log n)). | Keep sorting: rejected — violates constitution; produces inaccurate percentiles at scale. |
 
 ## Reference Artifacts
 
@@ -163,5 +162,5 @@ This feature is fully constitution-compliant. No deviations are required.
 | Risk | Mitigation |
 |---|---|
 | Refactoring existing `main.go` breaks scenario mode (`-f`) | Scenario path is preserved unchanged in `Run()`. The `root.go` wiring routes `--file` to the same `runScenario()` call. |
-| Threshold evaluation naïvely sorts all latencies (O(n log n)) | Use the engine's existing latency aggregation if available; otherwise document that p99 computation uses `sort` with a TODO for HDR histogram (Constitution XII). |
+| Threshold evaluation naïvely sorts all latencies (O(n log n)) | Use the engine's existing latency aggregation if available; otherwise document that p99 computation uses `sort` with a TODO for HDR histogram (Constitution: Result Integrity §). |
 | Exit code 2 vs 1 ambiguity | Document in contract: parse/validation errors → 2; runtime/test failures → 1. |

@@ -56,7 +56,7 @@ scenario := engine.Scenario{
 2. **Duration precedence**: If `Count > 0`, `Duration` is still set on the phase but the runner stops after `Count` total requests. The engine honors count over duration.
 3. **BodySource**:
    - `-D "raw body"` → `&engine.BodySource{Inline: "raw body"}`
-   - `-D @file.json` → `&engine.BodySource{File: "file.json"}` (relative to cwd)
+   - `-D @file.json` → `&engine.BodySource{File: "file.json"}` (relative to cwd; existence validated at execution time → exit code 1 if missing)
 4. **Headers**: Each `-H` flag is parsed as `"Key: Value"`. Missing colon is a validation error (exit code 2).
 5. **Default assertion**: `{Status: 200}`. No other assertions in quick mode v1.
 

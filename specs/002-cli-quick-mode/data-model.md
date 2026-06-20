@@ -65,6 +65,7 @@ QuickModeFlags
 │     engine.Phase                              │
 │       Name:     "load"                        │
 │       Duration: flags.Duration (or fallback)  │
+│       Count:    flags.Count (0 = disabled)    │
 │       Rate:     engine.RateProfile            │
 │         Constant: &flags.Workers              │
 │       Steps: [                                │

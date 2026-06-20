@@ -58,11 +58,8 @@ An SRE wants to integrate `htload` into a CI pipeline and fail the build if perf
 
 - **Zero workers**: `--workers 0` should be rejected as invalid (must be >= 1).
 - **Negative duration**: `--duration -1s` should be rejected as invalid.
-- **Both count and duration set**: Count takes precedence; duration is ignored.
-- **Neither count nor duration set**: Use default duration (30s).
-- **Invalid URL scheme**: `htload ftp://host` should exit 2 with a clear error.
-- **Missing file for `-D @file`**: Exit 2 with "file not found".
-- **Malformed headers**: `-H "bad"` (missing colon) should exit 2.
+- **Missing file for `-D @file`**: Exit 1 — file existence is validated at execution time (body resolution phase), not parse time.
+- **Malformed headers**: `-H "bad"` (missing colon) should be rejected as invalid at parse time (exit 2).
 - **Timeout/connection refused**: Exit 1, counted as failure in results.
 
 ## Requirements *(mandatory)*
@@ -72,17 +69,14 @@ An SRE wants to integrate `htload` into a CI pipeline and fail the build if perf
 - **FR-001**: The CLI entry point (`cmd/htload/main.go`) MUST use Cobra with `htload <url>` as the root command.
 - **FR-002**: Quick mode MUST support the following flags with defaults:
   - `--workers` / `-c` (int, default 1): concurrent VUs
-  - `--count` / `-n` (int, default 0): total request cap (0 = duration-based)
+  - `--count` / `-n` (int, default 0): total request cap (0 = duration-based). **Requires `engine.Phase.Count` addition; see plan complexity tracking.**
   - `--duration` / `-d` (duration, default 30s): test duration
   - `--method` / `-X` (string, default GET): HTTP method
   - `--header` / `-H` (string[], default []): repeatable headers
   - `--data` / `-D` (string, default ""): body (inline or `@file`)
   - `--fail-if-p99` (duration, default 0): exit 1 if p99 exceeds
   - `--fail-if-rate` (float64, default 0): exit 1 if success rate below
-- **FR-003**: Quick mode arguments MUST compile internally to a single-phase `engine.Scenario` with one Step.
-- **FR-004**: `-D "raw body"` MUST create `BodySource{Inline: ...}`; `-D @file.json` MUST create `BodySource{File: ...}`.
-- **FR-005**: The tool MUST exit with code 0 (all success), 1 (any failure or threshold breach), or 2 (invalid args).
-- **FR-006**: `--version` MUST print the version string.
+  - `--output` / `-o` (string, default ""): write raw JSON results to file (deferred to v2 for formatted output)
 - **FR-007**: Default assertion in quick mode MUST be `{Status: 200}` unless overridden.
 
 ### Key Entities
@@ -94,7 +88,7 @@ An SRE wants to integrate `htload` into a CI pipeline and fail the build if perf
 
 ### Measurable Outcomes
 
-- **SC-001**: `htload https://httpbin.org/get -c 10 -n 100` completes and exits 0.
+- **SC-001**: `htload https://httpbin.org/get -c 10 -d 5s` completes and exits 0.
 - **SC-002**: `htload https://httpbin.org/status/404` exits 1 (default status assertion fails).
 - **SC-003**: `htload ... -X POST -D '{"a":1}' -H "Content-Type: application/json"` sends correct body and header.
 - **SC-004**: `-D @file.json` loads file content into the request body.
@@ -115,5 +109,5 @@ An SRE wants to integrate `htload` into a CI pipeline and fail the build if perf
 - Scenario mode (`-f` flag) — covered by FR-003.
 - Template interpolation in quick mode.
 - Auth provisioning beyond static headers.
-- JSON output formatting (`-o` flag deferred if complexity exceeds v1 scope).
+- JSON output formatting (`-o` writes raw JSON in v1; pretty formatting deferred to v2).
 - Docker packaging.
