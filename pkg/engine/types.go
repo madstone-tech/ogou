@@ -2,16 +2,16 @@
 // It is intentionally independent of transport details.
 package engine
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
 // Scenario is the top-level unit of execution.
 type Scenario struct {
-	Name    string  `yaml:"name"`
-	BaseURL string  `yaml:"base_url"`
-	Phases  []Phase `yaml:"phases"`
+	Name     string            `yaml:"name"`
+	BaseURL  string            `yaml:"base_url"`
+	Headers  map[string]string `yaml:"headers,omitempty"`
+	Setup    []Step            `yaml:"setup,omitempty"`
+	Phases   []Phase           `yaml:"phases"`
+	Teardown []Step            `yaml:"teardown,omitempty"`
 }
 
 // Phase is a stage with a specific rate profile and duration.
@@ -37,19 +37,21 @@ type Ramp struct {
 
 // Step is a single request to issue.
 type Step struct {
-	Name        string            `yaml:"name"`
-	Method      string            `yaml:"method"`
-	Path        string            `yaml:"path"`
-	Headers     map[string]string `yaml:"headers,omitempty"`
-	Body        *BodySource       `yaml:"body,omitempty"`
-	Assertions  []Assertion       `yaml:"assertions,omitempty"`
-	Captures    []Capture         `yaml:"captures,omitempty"`
+	Name       string            `yaml:"name"`
+	Method     string            `yaml:"method"`
+	Path       string            `yaml:"path"`
+	Headers    map[string]string `yaml:"headers,omitempty"`
+	Body       *BodySource       `yaml:"body,omitempty"`
+	Assertions []Assertion       `yaml:"assertions,omitempty"`
+	Captures   []Capture         `yaml:"captures,omitempty"`
+	FailFast   bool              `yaml:"fail_fast,omitempty"`
 }
 
-// BodySource carries a request body via inline string or file reference.
+// BodySource carries a request body via inline string, file reference, or template.
 type BodySource struct {
-	Inline string `yaml:"inline,omitempty"`
-	File   string `yaml:"file,omitempty"`
+	Inline   string `yaml:"inline,omitempty"`
+	File     string `yaml:"file,omitempty"`
+	Template string `yaml:"template,omitempty"`
 }
 
 // Body returns the effective body bytes, reading from file if needed.
@@ -62,7 +64,22 @@ func (b *BodySource) Body() ([]byte, error) {
 
 // Assertion checks something about the response.
 type Assertion struct {
-	Status *int `yaml:"status,omitempty"`
+	Status       *int                   `yaml:"status,omitempty"`
+	JSONPath     *JSONPathAssertion     `yaml:"jsonpath,omitempty"`
+	ResponseTime *ResponseTimeAssertion `yaml:"response_time,omitempty"`
+}
+
+// JSONPathAssertion asserts on a JSON path expression.
+type JSONPathAssertion struct {
+	Path      string      `yaml:"path"`
+	Equals    interface{} `yaml:"equals,omitempty"`
+	Exists    bool        `yaml:"exists,omitempty"`
+	CaptureAs string      `yaml:"capture_as,omitempty"`
+}
+
+// ResponseTimeAssertion asserts on response latency.
+type ResponseTimeAssertion struct {
+	LessThan time.Duration `yaml:"less_than"`
 }
 
 // Capture extracts a value from the response into the step context.
@@ -73,6 +90,7 @@ type Capture struct {
 
 // StepContext carries mutable state for a single virtual user's journey.
 type StepContext struct {
+	VUID      int
 	Vars      map[string]any
 	Iteration int
 }
@@ -84,32 +102,12 @@ func NewStepContext() *StepContext {
 
 // Result is the outcome of executing one Step.
 type Result struct {
-	StepName      string
-	StartTime     time.Time
-	EndTime       time.Time
-	Latency       time.Duration
-	StatusCode    int    // transport-agnostic: HTTP 200, WS 101, gRPC 0
-	Success       bool   // passed all assertions
-	Error         string // non-empty if transport or assertion failed
-	CapturedVars  map[string]any
-}
-
-// Driver is the transport implementation.
-type Driver interface {
-	// Name returns a human-readable protocol name, e.g. "http".
-	Name() string
-
-	// Execute runs a single Step within a StepContext.
-	Execute(ctx context.Context, baseURL string, step Step, sc *StepContext) (*Result, error)
-
-	// Close tears down any persistent connections.
-	Close() error
-}
-
-// Reporter receives events during scenario execution.
-type Reporter interface {
-	OnPhaseStart(name string)
-	OnResult(r *Result)
-	OnPhaseEnd(name string, results []*Result)
-	OnScenarioEnd(scenarioName string, results []*Result)
+	StepName     string
+	StartTime    time.Time
+	EndTime      time.Time
+	Latency      time.Duration
+	StatusCode   int    // transport-agnostic: HTTP 200, WS 101, gRPC 0
+	Success      bool   // passed all assertions
+	Error        string // non-empty if transport or assertion failed
+	CapturedVars map[string]any
 }

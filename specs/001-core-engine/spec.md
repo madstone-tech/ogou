@@ -71,7 +71,7 @@ As an engineer testing stateful APIs, I want to generate unique request data per
 - **FR-006**: Each VU MUST have an isolated `StepContext` with its own variable map, primed with variables captured during global setup.
 - **FR-007**: The HTTP driver MUST support GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS.
 - **FR-008**: The HTTP driver MUST handle request bodies from inline strings or file references, and handle nil body safely.
-- **FR-009**: The HTTP driver MUST support simple status-code assertions.
+- **FR-009**: The HTTP driver MUST support status-code equality assertions for the v1 assertion engine.
 - **FR-010**: The ConsoleReporter MUST print phase start/end, per-request markers (✓/✗), and a scenario summary to stderr.
 - **FR-011**: The template engine MUST support `{{.VU.ID}}`, `{{.VU.Iteration}}`, `{{.Vars.NAME}}`, `{{.Env.NAME}}`, `{{.UUID}}`, `{{.RandomString N}}`, `{{.Timestamp}}`, `{{.TimestampNano}}`.
 - **FR-012**: Template errors MUST surface as `Result.Error` without crashing the runner.
@@ -99,7 +99,7 @@ As an engineer testing stateful APIs, I want to generate unique request data per
 ### Measurable Outcomes
 
 - **SC-001**: A Scenario with 5 VUs looping for 5 seconds against an httptest.Server completes without panic and produces at least 25 Results.
-- **SC-002**: Console output is human-readable: a person unfamiliar with the tool can distinguish success from failure at a glance.
+- **SC-002**: Console output uses distinct ✓/✗ Unicode markers, step names, status codes, and latencies in ≤80 columns; a person unfamiliar with the tool can distinguish success from failure at a glance.
 - **SC-003**: Template interpolation produces distinct values per VU/iteration when using `{{.UUID}}` or `{{.RandomString}}`.
-- **SC-004**: `pkg/engine/` compiles without importing `net/http` or any HTTP-specific package.
+- **SC-004**: `pkg/engine/` compiles without importing `net/http` or any HTTP-specific package; verified by `go list`.
 - **SC-005**: Test coverage on `pkg/engine/`, `pkg/http/`, `pkg/reporter/` is ≥ 80%; coverage on `internal/template/`, `internal/metrics/` is ≥ 80%.
